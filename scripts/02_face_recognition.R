@@ -72,6 +72,31 @@ load_images_detect_faces <- function(x){ # Input: character vector containing pa
 
 
 
-# Apply this to all images ------------------------------------------------
+# Apply this to 100 images ------------------------------------------------
 
-detected_images_df <- load_images_detect_faces(img_paths)
+detected_images_df <- load_images_detect_faces(sample100)
+
+
+
+# Apply this to all 1000 images --------------------------------------------
+
+i <- pbapply::pblapply(img_paths, magick::image_read)
+
+f <- pbapply::pblapply(i, image.libfacedetection::image_detect_faces)
+
+df <- as.data.frame(do.call(rbind, f))
+
+df$file_name <- stringr::str_extract(img_paths, pattern = "([^/]+\\.jpg)$")
+
+df <- df %>% unnest(cols = c(detections))
+
+
+# Save --------------------------------------------------------------------
+
+write_csv(df, "output/detected_faces_df.csv")
+
+
+
+# Crop images to faces only -----------------------------------------------
+
+

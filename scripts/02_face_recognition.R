@@ -11,7 +11,6 @@ rm(list = ls())
 # Load packages
 library(tidyverse)
 library(magrittr)
-
 library(magick)
 # install.packages("image.libfacedetection", repos = "https://bnosac.github.io/drat")
 library(image.libfacedetection)
@@ -21,14 +20,6 @@ library(image.libfacedetection)
 
 img_paths <- dir("./data/originals/", pattern = ".jpg", full.names = T) 
 
-set.seed(100)
-sample100 <- img_paths %>% sample(100)
-
-s <- sample100 %>% str_extract(pattern = "([^/]+\\.jpg)$")
-
-
-## Store this sample
-write.csv(data.frame(file_name = s), "./data/n100_sample/n100_sample.csv")
 
 # Prototyping -------------------------------------------------------------
 
@@ -56,47 +47,77 @@ df %<>% unnest(cols = c(detections))
 
 load_images_detect_faces <- function(x){ # Input: character vector containing pathes to images
   
-  i <- lapply(x, magick::image_read)
+  i <- pbapply::pblapply(x, magick::image_read)
   
-  f <- lapply(i, image.libfacedetection::image_detect_faces)
+  f <- pbapply::pblapply(i, image.libfacedetection::image_detect_faces)
   
   df <- as.data.frame(do.call(rbind, f))
   
   df$file_name <- stringr::str_extract(x, pattern = "([^/]+\\.jpg)$")
   
-  df <- df %>% unnest(cols = c(detections))
+  df <- df %>% tidyr::unnest(cols = c(detections))
   
   return(df)
   
 }
 
 
-
-# Apply this to 100 images ------------------------------------------------
-
-detected_images_df <- load_images_detect_faces(sample100)
-
-
-
-# Apply this to all 1000 images --------------------------------------------
-
 i <- pbapply::pblapply(img_paths, magick::image_read)
 
-f <- pbapply::pblapply(i, image.libfacedetection::image_detect_faces)
 
-df <- as.data.frame(do.call(rbind, f))
+## use subset
+i50 <- i[1:50]
 
-df$file_name <- stringr::str_extract(img_paths, pattern = "([^/]+\\.jpg)$")
 
-df <- df %>% unnest(cols = c(detections))
+# Apply this to all 1000 images ------------------------------------------------
+
+detected_faces_df <- load_images_detect_faces(img_paths)
+
+
+f50 <- pbapply::pblapply(i50, image.libfacedetection::image_detect_faces)
+
 
 
 # Save --------------------------------------------------------------------
 
-write_csv(df, "output/detected_faces_df.csv")
-
+write_csv(detected_faces_df, "output/detected_faces_df.csv")
 
 
 # Crop images to faces only -----------------------------------------------
+
+
+df %<>% mutate(crop_pos = paste0(width, "x", height, "+", x, "+", y),
+               path = paste0("./data/originals/", file_name)) 
+
+
+cropped_faces <- map2(.x = ti, .y = tdf$crop_pos, .f = image_crop)
+
+
+
+t_df  <- df[1:10,]
+
+
+crop_faces <- function(df){ # Input: df containing 
+  
+  i <- pbapply::pblapply(df$path, magick::image_read)
+  
+  cropped_faces <- map2(.x = i, .y = df$crop_pos, .f = magick::image_crop)
+  
+  return(cropped_faces)
+  
+}
+
+c_faces <- crop_faces(df)
+
+
+c_faces[1:30]
+
+
+# Plot some examples ------------------------------------------------------
+
+
+plot(f50[[40]], i50[[40]], border = "red", lwd = 7, col = "white")
+
+plot(f50[[21]], i50[[21]], border = "red", lwd = 7, col = "white")
 
 

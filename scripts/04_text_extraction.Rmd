@@ -1,0 +1,106 @@
+---
+title: "04_text_extraction"
+author: "JL"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list=ls()) 
+```
+
+## packages
+```{r packages}
+library(tidyverse)
+library(magick)
+library(tesseract) #install
+```
+## example image
+```{r}
+filepath = "../data/originals/B_DwSaCpR0H.jpg"
+im<-image_read(filepath)
+plot(im)
+```
+### retrieving text
+```{r}
+text <- ocr(filepath)
+cat(text) #print
+```
+
+## get XML HOCR output
+```{r}
+xml <- ocr(filepath, HOCR = TRUE)
+cat(xml)
+```
+## automating process
+```{r}
+extract_text <- function(directory) { #coding function to extract text from images
+  
+  #creating empty df
+  result_df <- data.frame(filename = character(), text = character(), stringsAsFactors = FALSE)
+  files <- list.files(directory, pattern = "\\.jpg$", full.names = TRUE) #getting list of files
+  
+  for (file in files) { #looping through files
+    text <- ocr(file) #extracting text from the image 
+    filename <- sub("^.*[/\\\\]", "", file) #removing file path
+    row <- data.frame(filename = filename, text = text, stringsAsFactors = FALSE) #
+    result_df <- rbind(result_df, row) #appending to df
+  }
+  return(result_df)
+}
+```
+
+## apply to all files
+```{r}
+src <- "../data/originals" 
+cat("We extract text for", length(list.files(src)), "files, so it might take a while.")
+```
+
+```{r}
+extracted_text <- extract_text(src)
+```
+```{r}
+head(extracted_text, 20)
+```
+```{r}
+cat("Sanity check #1: We ended up with", nrow(extracted_text), "extracted texts.")
+```
+```{r}
+filepath <- "../data/originals/B_-5Wh6B6za.jpg"
+im<-image_read(filepath)
+plot(im)
+cat("Sanity check #2:", print(extracted_text$text[4]))
+```
+The extracted text doesn't make sense as they're is no text.
+
+```{r}
+filepath <- "../data/originals/B_cU5kdFjeA.jpg"
+im<-image_read(filepath)
+plot(im)
+```
+```{r}
+print(extracted_text$text[16])
+```
+## save raw data as csv
+```{r}
+write.csv(extracted_text, file = "../data/features/extracted_text.csv", row.names = FALSE)
+```
+
+## cleaning the text
+```{r}
+#removing everything but characters
+cleaned_text <- extracted_text
+cleaned_text$text <- str_replace_all(extracted_text$text, "[^[:alnum:][:space:]]", "")
+cleaned_text$text <- str_replace_all(cleaned_text$text, "\n", " ")
+head(cleaned_text$text)
+```
+## remove giberish
+```{r}
+#clustering images?
+#word recognition?
+```
+
+## save clean text
+```{r}
+write.csv(cleaned_text, file = "../data/features/cleaned_text", row.names = FALSE)
+```
